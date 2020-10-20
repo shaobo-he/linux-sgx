@@ -1787,7 +1787,7 @@ let tproxy_fill_ms_field (pd: Ast.pdecl) (is_ocall_switchless: bool) =
                       ]
                       @ check_size @
                       [
-                       sprintf "\tmemset(__tmp_%s, 0, %s);" name len_var;
+                       (*sprintf "\tmemset(__tmp_%s, 0, %s);" name len_var;*)
                        sprintf "\t__tmp = (void *)((size_t)__tmp + %s);" len_var;
                        sprintf "\tocalloc_size -= %s;" len_var;
                        "} else {";
