@@ -1787,7 +1787,7 @@ let tproxy_fill_ms_field (pd: Ast.pdecl) (is_ocall_switchless: bool) =
                       ]
                       @ check_size @
                       [
-                       (*sprintf "\tmemset(__tmp_%s, 0, %s);" name len_var;*)
+                       sprintf "\tmemset(__tmp_%s, 0, %s);" name len_var;
                        sprintf "\t__tmp = (void *)((size_t)__tmp + %s);" len_var;
                        sprintf "\tocalloc_size -= %s;" len_var;
                        "} else {";
@@ -1920,7 +1920,7 @@ let gen_tproxy_local_vars (plist: Ast.pdecl list) =
 let gen_ocalloc_block (fname: string) (plist: Ast.pdecl list) (is_switchless: bool) =
   let ms_struct_name = mk_ms_struct_name fname in
   let new_param_list = List.map conv_array_to_ptr plist in
-  let local_vars_block = sprintf "%s* %s = NULL;\n\tsize_t ocalloc_size = sizeof(%s);\n\tvoid *__tmp = NULL;\n\n" ms_struct_name ms_struct_val ms_struct_name in
+  let local_vars_block = sprintf "%s* %s = NULL;\n\tsize_t ocalloc_size = sizeof(%s);\n\tvoid *__tmp = NULL;\n\tsize_t total_ocalloc_size = 0;\n" ms_struct_name ms_struct_val ms_struct_name in
   let local_var (ty: Ast.atype) (attr: Ast.ptr_attr) (name: string) =
     if not attr.Ast.pa_chkptr then ""
     else
@@ -1965,6 +1965,7 @@ let gen_ocalloc_block (fname: string) (plist: Ast.pdecl list) (is_switchless: bo
   let sgx_ocalloc_fn = get_sgx_fname SGX_OCALLOC is_switchless in
   let sgx_ocfree_fn = get_sgx_fname SGX_OCFREE is_switchless in
   let do_gen_ocalloc_block = [
+      sprintf "\n\ttotal_ocalloc_size = ocalloc_size;\n";
       sprintf "\n\t__tmp = %s(ocalloc_size);\n" sgx_ocalloc_fn;
       "\tif (__tmp == NULL) {\n";
       sprintf "\t\t%s();\n" sgx_ocfree_fn;
@@ -2191,6 +2192,14 @@ let gen_func_tproxy (ufunc: Ast.untrusted_func) (idx: int) =
   let sgx_ocall_fn = get_sgx_fname SGX_OCALL ufunc.Ast.uf_is_switchless in
   let ocall_null = sprintf "status = %s(%d, NULL);\n" sgx_ocall_fn idx in
   let ocall_with_ms = sprintf "status = %s(%d, %s);\n" sgx_ocall_fn idx ms_struct_val in
+  let ms_struct_name = mk_ms_struct_name fd.Ast.fname in
+  let mk_nondet =
+      let malloc_and_copy =
+          [
+          sprintf "\n\t__tmp = malloc(sizeof(total_ocalloc_size));";
+          sprintf "memcpy((void*)ms, __tmp, total_ocalloc_size);";]
+      in List.fold_left (fun acc s -> acc ^ "\t" ^ s ^ "\n") "" malloc_and_copy
+  in
   let update_retval = sprintf "\tif (%s) *%s = %s;"
                               retval_name retval_name (mk_parm_accessor retval_name) in
   let func_body = ref [] in
@@ -2204,6 +2213,7 @@ let gen_func_tproxy (ufunc: Ast.untrusted_func) (idx: int) =
         func_body := ocalloc_struct_deep_copy ufunc.Ast.uf_is_switchless :: !func_body;
         List.iter (fun pd -> func_body := tproxy_fill_structure pd ufunc.Ast.uf_is_switchless:: !func_body) fd.Ast.plist;
         func_body := ocall_with_ms :: !func_body;
+        func_body := mk_nondet :: !func_body;
         func_body := "if (status == SGX_SUCCESS) {" :: !func_body;
         if fd.Ast.rtype <> Ast.Void then func_body := update_retval :: !func_body;
         List.fold_left (fun acc s -> if s = "" then acc else acc ^ "\t" ^ s ^ "\n") func_open (List.rev !func_body) ^ func_close
