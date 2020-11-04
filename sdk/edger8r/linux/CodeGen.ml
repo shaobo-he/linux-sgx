@@ -2196,7 +2196,7 @@ let gen_func_tproxy (ufunc: Ast.untrusted_func) (idx: int) =
   let mk_nondet =
       let malloc_and_copy =
           [
-          sprintf "\n\t__tmp = malloc(sizeof(total_ocalloc_size));";
+          sprintf "\n\t__tmp = malloc(total_ocalloc_size);";
           sprintf "memcpy((void*)ms, __tmp, total_ocalloc_size);";]
       in List.fold_left (fun acc s -> acc ^ "\t" ^ s ^ "\n") "" malloc_and_copy
   in
