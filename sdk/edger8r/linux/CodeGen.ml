@@ -1669,14 +1669,15 @@ let gen_func_tbridge (fd: Ast.func_decl) (dummy_var: string) =
   let func_close = "\treturn status;\n}\n" in
 
   let ms_struct_name = mk_ms_struct_name fd.Ast.fname in
-  let declare_ms_ptr = sprintf "%s* %s = SGX_CAST(%s*, %s);\n%s = (%s*)malloc(sizeof(%s));"
+  let alloc_pms = sprintf "%s = (%s*)sgx_ocalloc(sizeof(%s));"
+                          ms_ptr_name
+                          ms_struct_name
+                          ms_struct_name in
+  let declare_ms_ptr = sprintf "%s* %s = SGX_CAST(%s*, %s);"
                                ms_struct_name
                                ms_struct_val
                                ms_struct_name
-                               ms_ptr_name
-                               ms_struct_val
-                               ms_struct_name
-                               ms_struct_name in
+                               ms_ptr_name in
 
   let invoke_func   = gen_func_invoking fd mk_parm_name_tbridge in
   let update_retval = sprintf "%s = %s"
@@ -1689,8 +1690,9 @@ let gen_func_tbridge (fd: Ast.func_decl) (dummy_var: string) =
       in
         sprintf "%s%s%s\t%s\n\t%s\n%s" func_open local_vars dummy_var check_pms invoke_func func_close
     else
-      sprintf "%s%s\t%s\n%s\n%s%s\n%s\n\t%s\n%s\n%s\n%s%s"
+      sprintf "%s%s\n%s\t%s\n%s\n%s%s\n%s\n\t%s\n%s\n%s\n%s%s"
         func_open
+        alloc_pms
         (mk_check_pms fd.Ast.fname)
         declare_ms_ptr
         local_vars
