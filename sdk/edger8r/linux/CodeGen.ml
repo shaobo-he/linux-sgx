@@ -1316,7 +1316,7 @@ let gen_parm_ptr_direction_pre (plist: Ast.pdecl list) =
               "\t\tstatus = SGX_ERROR_OUT_OF_MEMORY;";
               "\t\tgoto err;";
               "\t}\n";
-              sprintf "\t%s = (%s)malloc(%s);" tmp_ptr_name in_ptr_type len_var;
+              guard_with_macro (sprintf "\t%s = (%s)malloc(%s);" tmp_ptr_name in_ptr_type len_var) ecall_buffer_alloc_guard;
               sprintf "\tif (memcpy_s(%s, %s, %s, %s)) {" in_ptr_dst_name len_var tmp_ptr_name len_var;
               "\t\tstatus = SGX_ERROR_UNEXPECTED;";
               "\t\tgoto err;";
@@ -1479,7 +1479,7 @@ let gen_parm_ptr_direction_post (plist: Ast.pdecl list) =
             else
                 let code_template  = [ 
                   sprintf "\tif (%s) {" in_ptr_name;
-                  sprintf "%s = (%s)malloc(%s);" (mk_tmp_var name) in_ptr_type len_var;
+                  guard_with_macro (sprintf "%s = (%s)malloc(%s);" (mk_tmp_var name) in_ptr_type len_var) ecall_buffer_alloc_guard;
                   sprintf "%s\t\tif (memcpy_s(%s, %s, %s, %s)) {" struct_deep_copy_post (mk_tmp_var name) len_var in_ptr_name len_var;
                   "\t\t\tstatus = SGX_ERROR_UNEXPECTED;";
                   "\t\t\tgoto err;";
@@ -1679,10 +1679,10 @@ let gen_func_tbridge (fd: Ast.func_decl) (dummy_var: string) =
   let func_close = "\treturn status;\n}\n" in
 
   let ms_struct_name = mk_ms_struct_name fd.Ast.fname in
-  let alloc_pms = sprintf "%s = (%s*)sgx_ocalloc(sizeof(%s));"
+  let alloc_pms = guard_with_macro (sprintf "%s = (%s*)sgx_ocalloc(sizeof(%s));"
                           ms_ptr_name
                           ms_struct_name
-                          ms_struct_name in
+                          ms_struct_name) ecall_arg_alloc_guard in
   let declare_ms_ptr = sprintf "%s* %s = SGX_CAST(%s*, %s);"
                                ms_struct_name
                                ms_struct_val
